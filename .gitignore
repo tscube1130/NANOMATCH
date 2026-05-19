@@ -1,0 +1,17 @@
+# 1. CMake Build Folder (Contains all your Makefiles, cache, and profiler outputs)
+build/
+
+# 2. Compiled Executables (Never push binaries to GitHub!)
+ingest_test
+nano_bench
+
+# 3. Massive Synthetic Data Files
+*.csv
+
+# 4. Profiling Data (Just in case you run perf in the root folder later)
+perf.data
+perf.data.old
+profile.txt
+
+# 5. OS Junk
+.DS_Store
