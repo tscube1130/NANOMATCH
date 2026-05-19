@@ -8,7 +8,7 @@
 
 ## Latency Percentiles (Nanoseconds)
 
-*Measured via Google Benchmark using high-resolution hardware timers (`rdtsc`). All metrics reflect `real_time` wall-clock execution.*
+*Measured via Google Benchmark using high-resolution OS monotonic timers backed by hardware CPU counters. All metrics reflect `real_time` wall-clock execution.*
 
 | Benchmark Scenario | p50 (Median) | p90 (Tail) | p99 (Extreme Tail) |
 | :--- | :--- | :--- | :--- |
