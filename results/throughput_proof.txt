@@ -1,0 +1,5 @@
+Ingesting 5 Million Orders via mmap...
+Finished reading and processing 5000000 orders.
+Time taken: 0.242271 seconds.
+THROUGHPUT: 2.06381e+07 orders per second!
+Total trades executed: 1759
