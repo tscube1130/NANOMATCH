@@ -37,14 +37,17 @@ Performance claims mean nothing without microarchitectural proof. Inside the [`r
 git clone https://github.com/tscube1130/NANOMATCH.git
 cd NANOMATCH
 
-# 2. Generate the build system (Release mode is forced via CMakeLists)
+# 2. Generate the synthetic order dataset (Creates orders.csv)
+python3 generate_orders.py
+
+# 3. Generate the build system (Release mode is forced via CMakeLists)
 cmake -S . -B build
 
-# 3. Compile the targets
+# 4. Compile the targets
 cmake --build build -j
 
-# 4. Run the Latency Benchmarks
+# 5. Run the Latency Benchmarks
 ./build/nano_bench
 
-# 5. Run the Zero-Copy Throughput Test
+# 6. Run the Zero-Copy Throughput Test
 ./build/ingest_test
