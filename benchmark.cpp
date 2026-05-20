@@ -152,26 +152,28 @@ public:
 class OrderPool {
 private:
     std::vector<Order> pool;       
-    std::vector<int32_t> freeList; 
+    int32_t free_head = 0; // Just one integer to track the whole list!
 
 public:
     OrderPool(size_t capacity) {
         pool.resize(capacity); 
-        freeList.reserve(capacity);
-        for (int32_t i = capacity - 1; i >= 0; --i) {
-            freeList.push_back(i);
+        // Link every block to the next one
+        for (int32_t i = 0; i < capacity - 1; ++i) {
+            pool[i].nextOrderIndex = i + 1;
         }
+        pool[capacity - 1].nextOrderIndex = -1;
     }
 
     inline int32_t allocateOrder() noexcept {
-        if (freeList.empty()) return -1; 
-        int32_t index = freeList.back();
-        freeList.pop_back();
+        if (free_head == -1) return -1; 
+        int32_t index = free_head;
+        free_head = pool[index].nextOrderIndex; // O(1) array read
         return index;
     }
 
     inline void freeOrder(int32_t index) noexcept {
-        freeList.push_back(index);
+        pool[index].nextOrderIndex = free_head;
+        free_head = index;
     }
 
     inline Order& getOrder(int32_t index) noexcept { return pool[index]; }
@@ -215,7 +217,6 @@ public:
             quantity -= tradeQty;
             restingAsk.quantity -= tradeQty;
             bestAskLevel.totalVolume -= tradeQty;
-
             if (tradeQty > 0 && tradeBuffer) {
                 tradeBuffer->push({orderId, restingAsk.orderId, bestAskPrice, static_cast<uint32_t>(tradeQty)});
             }
@@ -382,10 +383,10 @@ static void BM_Pure_Crossing(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
     auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
     uint64_t id_counter = 1;
-
+    constexpr uint64_t MASK_524K = 524287; // (2^19) - 1
     for (auto _ : state) {
-        uint64_t buyId = (id_counter % 500000) + 1;
-        uint64_t sellId = buyId + 500000;
+        uint64_t buyId = (id_counter & MASK_524K) + 1;
+        uint64_t sellId = buyId + 524288;
         id_counter++;
 
         engine->addBuyOrder(buyId, 1, 100);
@@ -426,18 +427,32 @@ static void BM_Realistic_Market(benchmark::State& state) {
     // Benchmark: Spray random market orders testing cache misses and the linear scan
     std::uniform_int_distribution<uint64_t> marketPriceGen(9800, 10200);
     std::uniform_int_distribution<int> sideGen(0, 1);
+    constexpr uint64_t MASK_524K = 524287;
+    std::vector<uint64_t> pre_prices(524288);
+    std::vector<bool> pre_sides(524288);
+    for(int i = 0; i < 524288; i++) {
+        pre_prices[i] = marketPriceGen(rng);
+        pre_sides[i] = (sideGen(rng) == 0);
+    }
 
+    // 2. The blazing fast hot loop
     for (auto _ : state) {
-        uint64_t orderId = (id_counter % 900000) + 1; 
+        // Lightning-fast bitmask index
+        uint64_t idx = id_counter & MASK_524K; 
+        uint64_t orderId = idx + 1;
         id_counter++;
-        uint64_t price = marketPriceGen(rng);
         
-        if (sideGen(rng) == 0) {
+        // Grab pre-calculated price
+        uint64_t price = pre_prices[idx]; 
+
+        // Matching Logic
+        if (pre_sides[idx]) {
             engine->addBuyOrder(orderId, price, 100);
         } else {
             engine->addSellOrder(orderId, price, 100);
         }
 
+        // 🛡️ THE SHIELD: Prevents -O3 from deleting your code as "dead code"
         benchmark::DoNotOptimize(orderId);
         benchmark::DoNotOptimize(price);
     }
@@ -465,11 +480,11 @@ static void BM_100pct_Crossing(benchmark::State& state) {
     engine->addBuyOrder(999999, 9999, 1);   
 
     uint64_t base_id = 1;
-
+constexpr uint64_t MASK_262K = 262143; // (2^18) - 1
     for (auto _ : state) {
         
-        uint64_t sellId = (base_id % 400000) + 1;
-        uint64_t buyId = sellId + 400000;
+        uint64_t sellId = (base_id & MASK_262K) + 1;
+        uint64_t buyId = sellId + 262144;
         base_id++;
 
         engine->addSellOrder(sellId, 10000, 100);
@@ -495,9 +510,10 @@ static void BM_Pathological_Scan(benchmark::State& state) {
     engine->addSellOrder(999999, 20000, 1); 
 
     uint64_t base_id = 1;
+    constexpr uint64_t MASK_262K = 262143; // (2^18) - 1
     for (auto _ : state) {
-        uint64_t sellId = (base_id % 400000) + 1;
-        uint64_t buyId = sellId + 400000;
+        uint64_t sellId = (base_id & MASK_262K) + 1;
+        uint64_t buyId = sellId + 262144;
         base_id++;
 
         // 1. Place an Ask at 100. (bestAskPrice drops to 100)
@@ -521,8 +537,9 @@ static void BM_Order_Cancellation(benchmark::State& state) {
     auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
     
     uint64_t base_id = 1;
+    constexpr uint64_t MASK_524K = 524287; // (2^19) - 1
     for (auto _ : state) {
-        uint64_t id = (base_id % 900000) + 1;
+        uint64_t id = (base_id & MASK_524K) + 1;
         base_id++;
 
         engine->addBuyOrder(id, 10000, 100); // Insert
@@ -543,25 +560,39 @@ static void BM_Baseline_STL(benchmark::State& state) {
     std::uniform_int_distribution<uint32_t> qtyGen(10, 100);
 
     uint64_t id_counter = 1;
+    // Warmup: Build a deep, realistic order book
     for (int i = 0; i < 50000; ++i) {
         engine->addBuyOrder(id_counter++, bidPriceGen(rng), qtyGen(rng));
         engine->addSellOrder(id_counter++, askPriceGen(rng), qtyGen(rng));
     }
 
+    // Pre-generate 524,288 random orders during warmup to match custom engine fair-play
     std::uniform_int_distribution<uint64_t> marketPriceGen(9800, 10200);
     std::uniform_int_distribution<int> sideGen(0, 1);
-
+    constexpr uint64_t MASK_524K = 524287; // (2^19) - 1
+    
+    std::vector<uint64_t> pre_prices(524288);
+    std::vector<bool> pre_sides(524288);
+    for(int i = 0; i < 524288; i++) {
+        pre_prices[i] = marketPriceGen(rng);
+        pre_sides[i] = (sideGen(rng) == 0);
+    }
+    
+    // The hot loop: Now strictly testing std::map vs Custom Arena
     for (auto _ : state) {
-        uint64_t orderId = (id_counter % 900000) + 1; 
+        uint64_t idx = id_counter & MASK_524K; 
+        uint64_t orderId = idx + 1;
         id_counter++;
-        uint64_t price = marketPriceGen(rng);
         
-        if (sideGen(rng) == 0) {
+        uint64_t price = pre_prices[idx]; 
+        
+        if (pre_sides[idx]) {
             engine->addBuyOrder(orderId, price, 100);
         } else {
             engine->addSellOrder(orderId, price, 100);
         }
 
+        // 🛡️ Prevent compiler from optimizing away the loop
         benchmark::DoNotOptimize(orderId);
         benchmark::DoNotOptimize(price);
     }

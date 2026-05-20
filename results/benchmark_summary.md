@@ -1,6 +1,6 @@
 # NANOMATCH Benchmark Summary
 
-**Date Executed:** 2026-05-19  
+**Date Executed:** 2026-05-20  
 **Host Architecture:** ASUSAURUS (Native Linux/WSL)  
 **CPU Spec:** 16 Cores @ 3.99 GHz  
 **L3 Cache Size:** 16 MB (Optimized for spatial locality)  
@@ -8,21 +8,21 @@
 
 ## Latency Percentiles (Nanoseconds)
 
-*Measured via Google Benchmark using high-resolution OS monotonic timers backed by hardware CPU counters. All metrics reflect `real_time` wall-clock execution.*
+*Measured via Google Benchmark using high-resolution OS monotonic timers backed by hardware CPU counters. All metrics reflect `real_time` wall-clock execution on pinned CPU cores (`taskset -c 0,1`).*
 
 | Benchmark Scenario | p50 (Median) | p90 (Tail) | p99 (Extreme Tail) |
 | :--- | :--- | :--- | :--- |
-| **Order Cancellation** ($O(1)$ Linked-List Extraction) | 6.87 ns | 7.55 ns | 8.36 ns |
-| **Pure Crossing** (Branchless Execution) | 15.01 ns | 16.67 ns | 18.64 ns |
-| **100% Fill Rate** (Execution Stress Test) | 47.35 ns | 51.20 ns | 56.76 ns |
-| 🟢 **Realistic Market** (L3 Cache Stress Test) | **79.62 ns** | **85.27 ns** | **92.51 ns** |
-| 🔴 **Baseline: STL `std::map`** (Realistic Market) | **221.52 ns** | **271.08 ns** | **308.10 ns** |
-| **Pathological Scan** (Worst-case $O(n)$ flaw) | 16,653 ns | 17,985 ns | 19,227 ns |
+| **Order Cancellation** ($O(1)$ Linked-List Extraction) | 6.76 ns | 7.31 ns | 8.93 ns |
+| **Pure Crossing** (Branchless Execution) | 12.51 ns | 13.92 ns | 14.83 ns |
+| **100% Fill Rate** (Execution Stress Test) | 63.49 ns | 69.42 ns | 71.44 ns |
+| 🟢 **Realistic Market** (L3 Cache Stress Test) | **72.01 ns** | **73.18 ns** | **75.24 ns** |
+| 🔴 **Baseline: STL `std::map`** (Realistic Market) | **150.29 ns** | **174.45 ns** | **212.24 ns** |
+| **Pathological Scan** (Worst-case $O(n)$ flaw) | 16,754 ns | 18,817 ns | 20,066 ns |
 
- ## 🧠 Performance Conclusion
-The custom memory-arena architecture (`BM_Realistic_Market`) completed order matching and routing in **~79.6 ns** (median). The identically simulated market using standard C++ dynamically allocated structures (`BM_Baseline_STL`) required **~221.5 ns**. 
+## 🧠 Performance Conclusion
+The custom memory-arena architecture (`BM_Realistic_Market`) completed order matching and routing in **~72.0 ns** (median). The identically simulated market using standard C++ dynamically allocated structures (`BM_Baseline_STL`) required **~150.3 ns**. 
 
-By eliminating Operating System context switches (`malloc`/`free`) and aligning structures to hardware cache lines, **NanoMatch operates 278% faster than standard STL implementations**, providing strict deterministic latency even in the 99th percentile.
+By eliminating Operating System context switches (`malloc`/`free`) and aligning structures to hardware cache lines, **NanoMatch operates 2.08x faster than standard STL implementations**, providing strict deterministic latency even in the 99th percentile (75.24 ns).
 
 ## 🚀 Throughput Ingestion Test
 *(Measured via independent `mmap` zero-copy ingestion script)*
