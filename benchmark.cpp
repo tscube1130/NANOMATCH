@@ -439,8 +439,10 @@ static void BM_Realistic_Market(benchmark::State& state) {
     for (auto _ : state) {
         // Lightning-fast bitmask index
         uint64_t idx = id_counter & MASK_524K; 
-        uint64_t orderId = idx + 1;
+        // FIX: Offset by 200,000 so we NEVER overwrite the resting warmup orders (IDs 1 to 100k)
+        uint64_t orderId = idx + 200000; 
         id_counter++;
+        
         
         // Grab pre-calculated price
         uint64_t price = pre_prices[idx]; 
@@ -581,7 +583,7 @@ static void BM_Baseline_STL(benchmark::State& state) {
     // The hot loop: Now strictly testing std::map vs Custom Arena
     for (auto _ : state) {
         uint64_t idx = id_counter & MASK_524K; 
-        uint64_t orderId = idx + 1;
+        uint64_t orderId = idx + 200000; //  Applied the HFT ID-space offset fix
         id_counter++;
         
         uint64_t price = pre_prices[idx]; 
@@ -592,21 +594,21 @@ static void BM_Baseline_STL(benchmark::State& state) {
             engine->addSellOrder(orderId, price, 100);
         }
 
-        // 🛡️ Prevent compiler from optimizing away the loop
+        //  Prevent compiler from optimizing away the loop
         benchmark::DoNotOptimize(orderId);
         benchmark::DoNotOptimize(price);
     }
 }
 
 // We bumped repetitions to 100 and attached our custom p90/p99 calculators!
-BENCHMARK(BM_Pure_Crossing)
+    BENCHMARK(BM_Pure_Crossing)
     ->Unit(benchmark::kNanosecond)
     ->Repetitions(100)
     ->ComputeStatistics("p90", Percentile90)
     ->ComputeStatistics("p99", Percentile99)
     ->ReportAggregatesOnly(true);
 
-BENCHMARK(BM_Realistic_Market)
+    BENCHMARK(BM_Realistic_Market)
     ->Unit(benchmark::kNanosecond)
     ->Repetitions(100)
     ->ComputeStatistics("p90", Percentile90)
@@ -620,20 +622,6 @@ BENCHMARK(BM_Realistic_Market)
     ->ComputeStatistics("p99", Percentile99)
     ->ReportAggregatesOnly(true);
 
-    BENCHMARK(BM_Pathological_Scan)
-    ->Unit(benchmark::kNanosecond)
-    ->Repetitions(100)
-    ->ComputeStatistics("p90", Percentile90)
-    ->ComputeStatistics("p99", Percentile99)
-    ->ReportAggregatesOnly(true);
-
-BENCHMARK(BM_Order_Cancellation)
-    ->Unit(benchmark::kNanosecond)
-    ->Repetitions(100)
-    ->ComputeStatistics("p90", Percentile90)
-    ->ComputeStatistics("p99", Percentile99)
-    ->ReportAggregatesOnly(true);
-
     BENCHMARK(BM_Baseline_STL)
     ->Unit(benchmark::kNanosecond)
     ->Repetitions(100)
@@ -641,6 +629,20 @@ BENCHMARK(BM_Order_Cancellation)
     ->ComputeStatistics("p99", Percentile99)
     ->ReportAggregatesOnly(true);
 
+    BENCHMARK(BM_Pathological_Scan)
+    ->Unit(benchmark::kNanosecond)
+    ->Repetitions(100)
+    ->ComputeStatistics("p90", Percentile90)
+    ->ComputeStatistics("p99", Percentile99)
+    ->ReportAggregatesOnly(true);
 
+    BENCHMARK(BM_Order_Cancellation)
+    ->Unit(benchmark::kNanosecond)
+    ->Repetitions(100)
+    ->ComputeStatistics("p90", Percentile90)
+    ->ComputeStatistics("p99", Percentile99)
+    ->ReportAggregatesOnly(true);
+
+    
 BENCHMARK_MAIN();
 #endif
