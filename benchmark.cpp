@@ -158,7 +158,7 @@ public:
     OrderPool(size_t capacity) {
         pool.resize(capacity); 
         // Link every block to the next one
-        for (int32_t i = 0; i < capacity - 1; ++i) {
+        for (int32_t i = 0; i <static_cast<int32_t> (capacity) - 1; ++i) {
             pool[i].nextOrderIndex = i + 1;
         }
         pool[capacity - 1].nextOrderIndex = -1;
@@ -182,23 +182,25 @@ public:
 // ==========================================
 // 2. THE ENGINE (WITH STRUCTURAL FIXES)
 // ==========================================
-
+template<size_t BufCap = 131072>
 class LimitOrderBook {
 private:
     static constexpr size_t MAX_PRICE_TICKS = 200000;
-    std::array<PriceLevel, MAX_PRICE_TICKS> bids; 
-    std::array<PriceLevel, MAX_PRICE_TICKS> asks; 
+    std::vector<PriceLevel> bids; 
+    std::vector<PriceLevel> asks; 
     std::vector<int32_t> orderMap;
 
     OrderPool pool;
-    SPSCRingBuffer<100000>* tradeBuffer;
+    SPSCRingBuffer<BufCap>* tradeBuffer;
 
     uint64_t bestBidPrice = 0;
     uint64_t bestAskPrice = MAX_PRICE_TICKS; 
 
 public:
-    LimitOrderBook(size_t maxOrders, SPSCRingBuffer<100000>* buffer) : pool(maxOrders), tradeBuffer(buffer) {
+    LimitOrderBook(size_t maxOrders, SPSCRingBuffer<BufCap>* buffer) : pool(maxOrders), tradeBuffer(buffer) {
     orderMap.resize(maxOrders + 1, -1); // +1 because Order IDs start at 1
+    bids.resize(MAX_PRICE_TICKS);
+    asks.resize(MAX_PRICE_TICKS);
 
     }
     
@@ -222,8 +224,18 @@ public:
             }
 
             if (restingAsk.quantity == 0) [[likely]] {
-                bestAskLevel.headOrderIndex = restingAsk.nextOrderIndex;
-                if (bestAskLevel.headOrderIndex == -1) [[unlikely]] bestAskLevel.tailOrderIndex = -1;
+                // 🛡️ SNAPSHOT: Save the next pointer before the memory pool destroys it
+                int32_t nextAskIndex = restingAsk.nextOrderIndex; 
+                
+                bestAskLevel.headOrderIndex = nextAskIndex;
+                if (nextAskIndex == -1) [[unlikely]] {
+                    bestAskLevel.tailOrderIndex = -1;
+                } else {
+                    // 🛡️ THE FIX: Sever the backward link so the new head knows it is the head!
+                    pool.getOrder(nextAskIndex).prevOrderIndex = -1;
+                }
+                
+                
                 orderMap[restingAsk.orderId] = -1;
                 pool.freeOrder(currentAskIndex);
             }
@@ -243,7 +255,8 @@ public:
             newOrder.price = price;
             newOrder.quantity = quantity;
             newOrder.side = Side::BUY;
-            newOrder.nextOrderIndex = -1; 
+            newOrder.nextOrderIndex = -1;
+            newOrder.prevOrderIndex = -1; 
 
             PriceLevel& bidLevel = bids[price];
             if (bidLevel.tailOrderIndex == -1) [[unlikely]] {
@@ -282,13 +295,20 @@ public:
                 tradeBuffer->push({restingBid.orderId, orderId, bestBidPrice, static_cast<uint32_t>(tradeQty)});
             }
 
-            if (restingBid.quantity == 0) [[likely]] {
-                bestBidLevel.headOrderIndex = restingBid.nextOrderIndex;
-                if (bestBidLevel.headOrderIndex == -1) [[unlikely]] bestBidLevel.tailOrderIndex = -1;
+           if (restingBid.quantity == 0) [[likely]] {
+                // 🛡️ SNAPSHOT: Save the next pointer before the memory pool destroys it
+                int32_t nextBidIndex = restingBid.nextOrderIndex;
+                
+                bestBidLevel.headOrderIndex = nextBidIndex;
+              if (nextBidIndex == -1) [[unlikely]] {
+                    bestBidLevel.tailOrderIndex = -1;
+                } else {
+                    // 🛡️ THE FIX: Sever the backward link so the new head knows it is the head!
+                    pool.getOrder(nextBidIndex).prevOrderIndex = -1;
+                }
                 orderMap[restingBid.orderId] = -1;
                 pool.freeOrder(currentBidIndex);
             }
-
             if (bestBidLevel.headOrderIndex == -1) {
                 while (bestBidPrice > 0 && bids[bestBidPrice].headOrderIndex == -1) bestBidPrice--;
             }
@@ -306,6 +326,7 @@ public:
             newOrder.quantity = quantity;
             newOrder.side = Side::SELL;
             newOrder.nextOrderIndex = -1;
+            newOrder.prevOrderIndex = -1;
 
             PriceLevel& askLevel = asks[price];
             if (askLevel.tailOrderIndex == -1) [[unlikely]] {
@@ -358,6 +379,7 @@ public:
 // ==========================================
 // CUSTOM PERCENTILE STATISTICS
 // ==========================================
+#ifndef INGEST_BUILD
 static double Percentile90(const std::vector<double>& data) {
     if (data.empty()) return 0.0;
     std::vector<double> copy = data;
@@ -373,6 +395,7 @@ static double Percentile99(const std::vector<double>& data) {
     size_t idx = std::ceil(0.99 * copy.size()) - 1;
     return copy[idx];
 }
+#endif
 // ==========================================
 // 3. THE "NO-CHEAT" BENCHMARK SUITE
 // ==========================================
@@ -381,7 +404,7 @@ static double Percentile99(const std::vector<double>& data) {
 // Measures theoretical maximum speed of your logic inside the L1 Cache.
 static void BM_Pure_Crossing(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
-    auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
+    auto engine = std::make_unique<LimitOrderBook<100000>>(1500000, tradeLog.get()); 
     uint64_t id_counter = 1;
     constexpr uint64_t MASK_524K = 524287; // (2^19) - 1
     for (auto _ : state) {
@@ -401,7 +424,7 @@ static void BM_Pure_Crossing(benchmark::State& state) {
 // Deep order book, widespread prices, active consumer thread, massive L3 Cache misses.
 static void BM_Realistic_Market(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
-    auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
+    auto engine = std::make_unique<LimitOrderBook<100000>>(1500000, tradeLog.get()); 
     
     // Spin up consumer thread to read trades concurrently
     std::atomic<bool> keepRunning{true};
@@ -467,7 +490,7 @@ static void BM_Realistic_Market(benchmark::State& state) {
 // SCENARIO C: 100% Fill Rate under Chaotic Memory (The "Execution Stress" Test)
 static void BM_100pct_Crossing(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
-    auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
+    auto engine = std::make_unique<LimitOrderBook<100000>>(1500000, tradeLog.get()); 
     
     std::atomic<bool> keepRunning{true};
     std::thread loggerThread([&]() {
@@ -506,7 +529,7 @@ constexpr uint64_t MASK_262K = 262143; // (2^18) - 1
 // ==========================================
 static void BM_Pathological_Scan(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
-    auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
+    auto engine = std::make_unique<LimitOrderBook<100000>>(1500000, tradeLog.get()); 
     
     // Put a Sentinel Ask incredibly far away
     engine->addSellOrder(999999, 20000, 1); 
@@ -536,7 +559,7 @@ static void BM_Pathological_Scan(benchmark::State& state) {
 // ==========================================
 static void BM_Order_Cancellation(benchmark::State& state) {
     auto tradeLog = std::make_unique<SPSCRingBuffer<100000>>(); 
-    auto engine = std::make_unique<LimitOrderBook>(1000000, tradeLog.get()); 
+    auto engine = std::make_unique<LimitOrderBook<100000>>(1500000, tradeLog.get()); 
     
     uint64_t base_id = 1;
     constexpr uint64_t MASK_524K = 524287; // (2^19) - 1

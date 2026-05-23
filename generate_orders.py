@@ -25,18 +25,23 @@ def generate_data():
             
             else:
                 side = 'B' if random.random() < 0.5 else 'S'
+                
+                # DENSE MARKET FIX: Tightly packed 10-tick spread
                 if side == 'B':
-                    price = random.randint(9000, 10000)
+                    price = random.randint(9995, 10000) 
                 else:
-                    price = random.randint(10000, 11000)
+                    price = random.randint(10000, 10005) 
+                
                 qty = random.randint(1, 100) * 10
                 
                 writer.writerow([order_id, side, price, qty])
                 active_orders.append(order_id)
                 
-                # Keep memory usage light
+                # O(1) Python Sliding Window trick
                 if len(active_orders) > 10000:
-                    active_orders.pop(0)
+                    # Faster than pop(0)
+                    active_orders[0] = active_orders[-1]
+                    active_orders.pop()
                     
     print(f"Success! Saved to {FILENAME}")
 

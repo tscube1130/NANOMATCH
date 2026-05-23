@@ -71,8 +71,10 @@ cmake --build build -j
 # 5. Run the Latency Benchmarks (We recommend pinning to a core)
 taskset -c 0,1 ./build/nano_bench
 
-# 6. Run the Zero-Copy Throughput Test
-./build/ingest_test
+# 6. Run the Zero-Copy Throughput Tests
+./build/ingest_fast      # Core matching speed only (~23M orders/sec)
+./build/ingest_e2e       # Full pipeline with concurrent trade logger (~18M orders/sec)
+
 ```
 
 ## 🔥 Generating Flame Graphs (Linux Perf & Speedscope)

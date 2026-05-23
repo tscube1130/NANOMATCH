@@ -2,7 +2,8 @@
 build/
 
 # 2. Compiled Executables (Never push binaries to GitHub!)
-ingest_test
+ingest_e2e
+ingest_fast
 nano_bench
 
 # 3. Massive Synthetic Data Files

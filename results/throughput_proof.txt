@@ -1,5 +1,48 @@
+================================================================
+         NANOMATCH — THROUGHPUT PROOF
+         Zero-Copy mmap Ingestion @ 5,000,000 Orders
+================================================================
+
+System Info:
+  CPU     : AMD Ryzen 9 8945HS w/ Radeon 780M Graphics
+  Cores   : 8C / 16T @ up to 5.2GHz (Zen 4)
+  OS      : Windows 11 (WSL2 — Ubuntu)
+  Kernel  : 6.6.87.2-microsoft-standard-WSL2
+  Compiler: GCC 13 | -O3 -march=native -flto
+
+  Note: Running inside WSL2. mmap performance may be slightly
+        bottlenecked by the Windows/Linux filesystem boundary.
+        Native Linux numbers would be higher.
+
+----------------------------------------------------------------
+TEST 1: Core Matching Speed  (./build/ingest_fast)
+        Logging DISABLED — pure engine throughput, no I/O overhead
+----------------------------------------------------------------
+
+Mode: Core Matching Speed (Logging DISABLED - God Mode)
 Ingesting 5 Million Orders via mmap...
 Finished reading and processing 5000000 orders.
-Time taken: 0.220695 seconds.
-THROUGHPUT: 2.26557e+07 orders per second!
-Total trades executed: 1547
+Time taken: 0.211435 seconds.
+THROUGHPUT: 2.36479e+07 orders per second!
+
+----------------------------------------------------------------
+TEST 2: End-to-End Pipeline  (./build/ingest_e2e)
+        Logging ENABLED — matching + concurrent SPSC trade logger
+----------------------------------------------------------------
+
+Mode: End-to-End Pipeline (Logging ENABLED)
+Ingesting 5 Million Orders via mmap...
+Finished reading and processing 5000000 orders.
+Time taken: 0.275156 seconds.
+THROUGHPUT: 1.81715e+07 orders per second!
+Total trades executed & logged: 657367
+
+================================================================
+SUMMARY
+================================================================
+
+  ingest_fast  (no logger)  :  23,647,900 orders/sec
+  ingest_e2e   (with logger):  18,171,500 orders/sec
+  Logger overhead           :    ~23.2% throughput cost
+
+================================================================
