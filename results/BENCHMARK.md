@@ -15,21 +15,21 @@
 
 ## 📋 Table of Contents
 
-1. [🗂️ Benchmark Scenarios](#benchmark-scenarios)
-2. [📊 Results: Latency Percentiles](#results-latency-percentiles-nanoseconds-real_time)
-3. [🚀 Speedup Analysis: NANOMATCH vs STL Baseline](#speedup-analysis-nanomatch-vs-stl-baseline)
-4. [⚡ E2E Throughput (mmap Ingestion)](#e2e-throughput-mmap-ingestion)
-5. [🔬 Scenario-by-Scenario Breakdown](#scenario-by-scenario-breakdown)
+1. [🗂️ Benchmark Scenarios](#%EF%B8%8F-benchmark-scenarios)
+2. [📊 Results: Latency Percentiles](#-results-latency-percentiles-nanoseconds-real_time)
+3. [🚀 Speedup Analysis: NANOMATCH vs STL Baseline](#-speedup-analysis-nanomatch-vs-stl-baseline)
+4. [⚡ E2E Throughput (mmap Ingestion)](#-e2e-throughput-mmap-ingestion)
+5. [🔬 Scenario-by-Scenario Breakdown](#-scenario-by-scenario-breakdown)
    - [1. Order Cancellation — 6.76 ns](#1-order-cancellation--676-ns-p50)
    - [2. Pure Crossing — 12.51 ns](#2-pure-crossing--1251-ns-p50)
    - [3. 100% Fill Rate — 63.49 ns](#3-100-fill-rate--6349-ns-p50)
-   - [4. Realistic Market — 72.01 ns ⭐](#4-realistic-market--7201-ns-p50-️-the-primary-result)
+   - [4. Realistic Market — 72.01 ns ⭐](#4-realistic-market--7201-ns-p50-%EF%B8%8F-the-primary-result)
    - [5. STL Baseline — 150.29 ns](#5-stl-baseline--15029-ns-p50)
    - [6. Pathological Scan — 16,754 ns](#6-pathological-scan--16754-ns-p50-disclosed-weakness)
-6. [🛡️ Benchmark Integrity — How We Defeated Common Microbenchmark Cheats](#️-benchmark-integrity--how-we-defeated-common-microbenchmark-cheats)
+6. [🛡️ Benchmark Integrity — How We Defeated Common Microbenchmark Cheats](#%EF%B8%8F-benchmark-integrity--how-we-defeated-common-microbenchmark-cheats)
 7. [📐 Statistical Methodology](#-statistical-methodology)
 8. [🔥 Flame Graph Evidence](#-flame-graph-evidence)
-9. [⚠️ Known Limitations](#️-known-limitations)
+9. [⚠️ Known Limitations](#%EF%B8%8F-known-limitations)
 
 ---
 
