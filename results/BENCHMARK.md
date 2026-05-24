@@ -293,8 +293,8 @@ Standard percentile-of-sorted-samples. With 100 repetitions, p90 = the 90th samp
 
 | File | What It Shows |
 |---|---|
-| [`flamegraph_custom_engine.png`](results/flamegraph_custom_engine.png) | Stack ends at `addBuyOrder` / `addSellOrder`. Zero `malloc` / `operator new` frames. Zero-allocation hot path confirmed. |
-| [`flamegraph_stl_baseline.png`](results/flamegraph_stl_baseline.png) | Stack descends 6+ frames through `operator new` → `malloc` → kernel allocator on every order. Heap allocation in hot path confirmed. |
+| [`flamegraph_custom_engine.png`](flamegraph_custom_engine.png) | Stack ends at `addBuyOrder` / `addSellOrder`. Zero `malloc` / `operator new` frames. Zero-allocation hot path confirmed. |
+| [`flamegraph_stl_baseline.png`](flamegraph_stl_baseline.png) | Stack descends 6+ frames through `operator new` → `malloc` → kernel allocator on every order. Heap allocation in hot path confirmed. |
 
 ---
 
